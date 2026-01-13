@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface HeaderProps {
   activePage?: 'dashboard' | 'transaksi' | 'laporan';
@@ -11,12 +12,11 @@ export default function Header({ activePage = 'dashboard' }: HeaderProps) {
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-[var(--card-bg)]/80 border-b border-[var(--border)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[var(--primary)] to-[var(--secondary)] rounded-xl flex items-center justify-center">
-                <span className="text-white text-xl font-bold">M</span>
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center">
+              <div className="relative w-24 h-24">
+                <Image src="/Myney Logo.png" alt="Myney Logo" fill className="object-contain" priority />
               </div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] bg-clip-text text-transparent">Myney</h1>
             </Link>
           </div>
           <nav className="hidden md:flex items-center gap-6">
