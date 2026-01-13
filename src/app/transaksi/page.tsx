@@ -1,0 +1,324 @@
+'use client';
+
+import { useState } from 'react';
+import Header from '@/components/Header';
+import AddTransactionModal from '@/components/AddTransactionModal';
+import FloatingAddButton from '@/components/FloatingAddButton';
+import { Transaction, TransactionType, incomeCategories, expenseCategories } from '@/types';
+
+// Sample data untuk demo
+const initialTransactions: Transaction[] = [
+  {
+    id: '1',
+    type: 'income',
+    amount: 15000000,
+    category: 'Gaji',
+    description: 'Gaji bulan Januari',
+    date: '2026-01-10',
+  },
+  {
+    id: '2',
+    type: 'expense',
+    amount: 500000,
+    category: 'Makanan',
+    description: 'Belanja bulanan',
+    date: '2026-01-12',
+  },
+  {
+    id: '3',
+    type: 'expense',
+    amount: 1500000,
+    category: 'Tagihan',
+    description: 'Listrik dan internet',
+    date: '2026-01-11',
+  },
+  {
+    id: '4',
+    type: 'income',
+    amount: 2500000,
+    category: 'Freelance',
+    description: 'Project website',
+    date: '2026-01-08',
+  },
+  {
+    id: '5',
+    type: 'expense',
+    amount: 200000,
+    category: 'Transportasi',
+    description: 'Bensin',
+    date: '2026-01-13',
+  },
+  {
+    id: '6',
+    type: 'expense',
+    amount: 150000,
+    category: 'Hiburan',
+    description: 'Nonton bioskop',
+    date: '2026-01-09',
+  },
+  {
+    id: '7',
+    type: 'expense',
+    amount: 300000,
+    category: 'Kesehatan',
+    description: 'Obat-obatan',
+    date: '2026-01-07',
+  },
+];
+
+export default function TransaksiPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  };
+
+  const getCategoryIcon = (transaction: Transaction) => {
+    const categories = transaction.type === 'income' ? incomeCategories : expenseCategories;
+    const category = categories.find((c) => c.name === transaction.category);
+    return category?.icon || '📦';
+  };
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter((t) => {
+    const matchesType = filterType === 'all' || t.type === filterType;
+    const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
+    const matchesSearch = t.description.toLowerCase().includes(searchQuery.toLowerCase()) || t.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDateFrom = !dateFrom || new Date(t.date) >= new Date(dateFrom);
+    const matchesDateTo = !dateTo || new Date(t.date) <= new Date(dateTo);
+
+    return matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo;
+  });
+
+  // Sort by date (newest first)
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Get available categories based on filter type
+  const availableCategories = filterType === 'income' ? incomeCategories : filterType === 'expense' ? expenseCategories : [...incomeCategories, ...expenseCategories];
+
+  const handleAddTransaction = (newTransaction: { type: TransactionType; amount: number; category: string; description: string; date: string }) => {
+    const transaction: Transaction = {
+      id: Date.now().toString(),
+      ...newTransaction,
+    };
+    setTransactions([transaction, ...transactions]);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    setTransactions(transactions.filter((t) => t.id !== id));
+  };
+
+  const totalFiltered = sortedTransactions.reduce((sum, t) => {
+    return t.type === 'income' ? sum + t.amount : sum - t.amount;
+  }, 0);
+
+  return (
+    <div className="min-h-screen bg-[var(--background)]">
+      <Header activePage="transaksi" />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Transaksi 💳</h1>
+          <p className="text-[var(--foreground)]/60">Kelola semua transaksi pendapatan dan pengeluaran Anda</p>
+        </div>
+
+        {/* Filters Section */}
+        <div className="card mb-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Cari Transaksi</label>
+              <div className="relative">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground)]/40">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input type="text" placeholder="Cari berdasarkan deskripsi atau kategori..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input-field pl-10" />
+              </div>
+            </div>
+
+            {/* Type Filter */}
+            <div className="w-full lg:w-48">
+              <label className="block text-sm font-medium mb-2">Tipe</label>
+              <select
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value as 'all' | TransactionType);
+                  setFilterCategory('all');
+                }}
+                className="input-field"
+              >
+                <option value="all">Semua</option>
+                <option value="income">Pendapatan</option>
+                <option value="expense">Pengeluaran</option>
+              </select>
+            </div>
+
+            {/* Category Filter */}
+            <div className="w-full lg:w-48">
+              <label className="block text-sm font-medium mb-2">Kategori</label>
+              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="input-field">
+                <option value="all">Semua Kategori</option>
+                {availableCategories.map((cat) => (
+                  <option key={`${cat.type}-${cat.id}`} value={cat.name}>
+                    {cat.icon} {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Date Range */}
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Dari Tanggal</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="input-field" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Sampai Tanggal</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="input-field" />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterType('all');
+                  setFilterCategory('all');
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+                className="px-6 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--background)] transition-colors font-medium"
+              >
+                Reset Filter
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="card flex-1 min-w-[200px]">
+            <p className="text-sm text-[var(--foreground)]/60 mb-1">Total Transaksi</p>
+            <p className="text-2xl font-bold">{sortedTransactions.length}</p>
+          </div>
+          <div className="card flex-1 min-w-[200px]">
+            <p className="text-sm text-[var(--foreground)]/60 mb-1">Total Pendapatan</p>
+            <p className="text-2xl font-bold text-green-500">{formatCurrency(sortedTransactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0))}</p>
+          </div>
+          <div className="card flex-1 min-w-[200px]">
+            <p className="text-sm text-[var(--foreground)]/60 mb-1">Total Pengeluaran</p>
+            <p className="text-2xl font-bold text-red-500">{formatCurrency(sortedTransactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0))}</p>
+          </div>
+          <div className="card flex-1 min-w-[200px]">
+            <p className="text-sm text-[var(--foreground)]/60 mb-1">Selisih</p>
+            <p className={`text-2xl font-bold ${totalFiltered >= 0 ? 'text-green-500' : 'text-red-500'}`}>{formatCurrency(totalFiltered)}</p>
+          </div>
+        </div>
+
+        {/* Transaction Table */}
+        <div className="card overflow-hidden">
+          <h3 className="text-xl font-bold mb-4">Daftar Transaksi</h3>
+
+          {sortedTransactions.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 mx-auto mb-4 bg-[var(--background)] rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-[var(--foreground)]/30">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Tidak Ada Transaksi</h3>
+              <p className="text-[var(--foreground)]/60">Tidak ada transaksi yang sesuai dengan filter</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left py-4 px-4 font-semibold text-[var(--foreground)]/60">Tanggal</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[var(--foreground)]/60">Kategori</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[var(--foreground)]/60">Deskripsi</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[var(--foreground)]/60">Tipe</th>
+                    <th className="text-right py-4 px-4 font-semibold text-[var(--foreground)]/60">Jumlah</th>
+                    <th className="text-center py-4 px-4 font-semibold text-[var(--foreground)]/60">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTransactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-b border-[var(--border)] hover:bg-[var(--background)] transition-colors">
+                      <td className="py-4 px-4">
+                        <span className="text-sm">{formatDate(transaction.date)}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{getCategoryIcon(transaction)}</span>
+                          <span className="font-medium">{transaction.category}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-[var(--foreground)]/80">{transaction.description || '-'}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                            transaction.type === 'income' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}
+                        >
+                          {transaction.type === 'income' ? 'Pendapatan' : 'Pengeluaran'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className={`font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                          {transaction.type === 'income' ? '+' : '-'}
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <button
+                          onClick={() => handleDeleteTransaction(transaction.id)}
+                          className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200 mx-auto"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Floating Add Button */}
+      <FloatingAddButton onClick={() => setIsModalOpen(true)} />
+
+      {/* Add Transaction Modal */}
+      <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAdd={handleAddTransaction} />
+    </div>
+  );
+}
