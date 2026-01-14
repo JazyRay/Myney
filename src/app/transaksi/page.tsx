@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import AddTransactionModal from '@/components/AddTransactionModal';
 import FloatingAddButton from '@/components/FloatingAddButton';
+import BalanceCard from '@/components/BalanceCard';
 import { Transaction, TransactionType, incomeCategories, expenseCategories } from '@/types';
 
 // Sample data untuk demo
@@ -75,6 +76,12 @@ export default function TransaksiPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  // Quick input states
+  const [quickAmount, setQuickAmount] = useState<string>('');
+  const [quickType, setQuickType] = useState<TransactionType>('expense');
+  const [quickCategory, setQuickCategory] = useState<string>('');
+  const [quickDescription, setQuickDescription] = useState<string>('');
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -127,6 +134,51 @@ export default function TransaksiPage() {
     setTransactions(transactions.filter((t) => t.id !== id));
   };
 
+  // Get categories for quick input based on selected type
+  const quickInputCategories = quickType === 'income' ? incomeCategories : expenseCategories;
+
+  // Quick add transaction handler
+  const handleQuickAdd = () => {
+    const amount = parseFloat(quickAmount.replace(/[^0-9]/g, ''));
+    if (!amount || amount <= 0) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const selectedCategory = quickCategory || 'Lainnya';
+
+    const transaction: Transaction = {
+      id: Date.now().toString(),
+      type: quickType,
+      amount: amount,
+      category: selectedCategory,
+      description: quickDescription || (quickType === 'income' ? 'Pendapatan cepat' : 'Pengeluaran cepat'),
+      date: today,
+    };
+
+    setTransactions([transaction, ...transactions]);
+    setQuickAmount('');
+    setQuickCategory('');
+    setQuickDescription('');
+  };
+
+  // Handle quick type change - reset category when type changes
+  const handleQuickTypeChange = (type: TransactionType) => {
+    setQuickType(type);
+    setQuickCategory('');
+  };
+
+  // Format input number with thousand separator
+  const formatInputNumber = (value: string) => {
+    const number = value.replace(/[^0-9]/g, '');
+    return number ? new Intl.NumberFormat('id-ID').format(parseInt(number)) : '';
+  };
+
+  // Calculate total income, expense, and balance
+  const totalIncome = transactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpense = transactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+
+  const totalBalance = totalIncome - totalExpense;
+
   const totalFiltered = sortedTransactions.reduce((sum, t) => {
     return t.type === 'income' ? sum + t.amount : sum - t.amount;
   }, 0);
@@ -140,6 +192,129 @@ export default function TransaksiPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Transaksi 💳</h1>
           <p className="text-[var(--foreground)]/60">Kelola semua transaksi pendapatan dan pengeluaran Anda</p>
+        </div>
+
+        {/* Balance Card */}
+        <div className="mb-6">
+          <BalanceCard balance={totalBalance} income={totalIncome} expense={totalExpense} />
+        </div>
+
+        {/* Quick Input Section */}
+        <div className="card mb-6">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <span>⚡</span> Input Cepat
+          </h3>
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Amount Input */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Nominal</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground)]/60 font-medium">Rp</span>
+                <input
+                  type="text"
+                  placeholder="Masukkan nominal..."
+                  value={quickAmount}
+                  onChange={(e) => setQuickAmount(formatInputNumber(e.target.value))}
+                  className="input-field pl-10 text-lg font-semibold"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') handleQuickAdd();
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Category Selection */}
+            <div className="w-full md:w-48">
+              <label className="block text-sm font-medium mb-2">Kategori</label>
+              <select value={quickCategory} onChange={(e) => setQuickCategory(e.target.value)} className="input-field">
+                <option value="">Pilih Kategori</option>
+                {quickInputCategories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>
+                    {cat.icon} {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Description Input */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Deskripsi (opsional)</label>
+              <input
+                type="text"
+                placeholder="Contoh: Makan siang, Gaji, dll..."
+                value={quickDescription}
+                onChange={(e) => setQuickDescription(e.target.value)}
+                className="input-field"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') handleQuickAdd();
+                }}
+              />
+            </div>
+
+            {/* Type Selection */}
+            <div className="w-full md:w-auto">
+              <label className="block text-sm font-medium mb-2">Tipe Transaksi</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleQuickTypeChange('expense')}
+                  className={`flex-1 md:flex-none px-4 py-3 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                    quickType === 'expense' ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15m0 0l6.75 6.75M4.5 12l6.75-6.75" />
+                  </svg>
+                  <span className="hidden sm:inline">Pengeluaran</span>
+                </button>
+                <button
+                  onClick={() => handleQuickTypeChange('income')}
+                  className={`flex-1 md:flex-none px-4 py-3 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                    quickType === 'income' ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
+                  </svg>
+                  <span className="hidden sm:inline">Pendapatan</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Add Button */}
+            <div className="flex items-end">
+              <button
+                onClick={handleQuickAdd}
+                disabled={!quickAmount}
+                className={`w-full md:w-auto px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  quickAmount ? 'bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white shadow-lg hover:shadow-xl hover:scale-105' : 'bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Tambah
+              </button>
+            </div>
+          </div>
+
+          {/* Preview */}
+          {quickAmount && (
+            <div
+              className={`mt-4 p-4 rounded-xl border-2 border-dashed ${quickType === 'income' ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20' : 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/20'}`}
+            >
+              <p className="text-sm text-[var(--foreground)]/60 mb-1">Preview transaksi:</p>
+              <p className={`text-lg font-bold ${quickType === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {quickType === 'income' ? '+' : '-'} Rp {quickAmount}
+                <span className="text-sm font-normal text-[var(--foreground)]/60 ml-2">({quickType === 'income' ? 'Pendapatan' : 'Pengeluaran'})</span>
+              </p>
+              {quickCategory && (
+                <p className="text-sm text-[var(--foreground)]/60 mt-1">
+                  {quickInputCategories.find((c) => c.name === quickCategory)?.icon || '📦'} {quickCategory}
+                </p>
+              )}
+              {quickDescription && <p className="text-sm text-[var(--foreground)]/60 mt-1">📝 {quickDescription}</p>}
+            </div>
+          )}
         </div>
 
         {/* Filters Section */}
