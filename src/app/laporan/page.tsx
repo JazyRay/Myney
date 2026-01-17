@@ -1,31 +1,28 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import { Transaction, incomeCategories, expenseCategories } from '@/types';
-
-// Sample data untuk demo
-const initialTransactions: Transaction[] = [
-  { id: '1', type: 'income', amount: 15000000, category: 'Gaji', description: 'Gaji bulan Januari', date: '2026-01-10' },
-  { id: '2', type: 'expense', amount: 500000, category: 'Makanan', description: 'Belanja bulanan', date: '2026-01-12' },
-  { id: '3', type: 'expense', amount: 1500000, category: 'Tagihan', description: 'Listrik dan internet', date: '2026-01-11' },
-  { id: '4', type: 'income', amount: 2500000, category: 'Freelance', description: 'Project website', date: '2026-01-08' },
-  { id: '5', type: 'expense', amount: 200000, category: 'Transportasi', description: 'Bensin', date: '2026-01-13' },
-  { id: '6', type: 'expense', amount: 150000, category: 'Hiburan', description: 'Nonton bioskop', date: '2026-01-09' },
-  { id: '7', type: 'expense', amount: 300000, category: 'Kesehatan', description: 'Obat-obatan', date: '2026-01-07' },
-  { id: '8', type: 'income', amount: 12000000, category: 'Gaji', description: 'Gaji bulan Desember', date: '2025-12-10' },
-  { id: '9', type: 'expense', amount: 2000000, category: 'Belanja', description: 'Beli baju', date: '2025-12-15' },
-  { id: '10', type: 'expense', amount: 800000, category: 'Makanan', description: 'Makan di restoran', date: '2025-12-20' },
-  { id: '11', type: 'income', amount: 1000000, category: 'Bonus', description: 'Bonus akhir tahun', date: '2025-12-25' },
-  { id: '12', type: 'expense', amount: 500000, category: 'Hiburan', description: 'Liburan', date: '2025-12-28' },
-];
+import { incomeCategories, expenseCategories } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import { useTransactions } from '@/hooks/useTransactions';
 
 const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export default function LaporanPage() {
-  const [transactions] = useState<Transaction[]>(initialTransactions);
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  const { transactions, isLoading } = useTransactions();
+
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -35,13 +32,23 @@ export default function LaporanPage() {
     }).format(amount);
   };
 
+  // Convert transactions for display
+  const formattedTransactions = transactions.map((t) => ({
+    id: t.id,
+    type: t.type,
+    amount: Number(t.amount),
+    category: t.category,
+    description: t.description || '',
+    date: t.date,
+  }));
+
   // Filter transactions by selected month and year
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    return formattedTransactions.filter((t) => {
       const date = new Date(t.date);
       return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
     });
-  }, [transactions, selectedMonth, selectedYear]);
+  }, [formattedTransactions, selectedMonth, selectedYear]);
 
   // Calculate summary
   const summary = useMemo(() => {
@@ -111,6 +118,23 @@ export default function LaporanPage() {
   }, [filteredTransactions, selectedMonth, selectedYear]);
 
   const maxDailyAmount = Math.max(...dailyData.map((d) => Math.max(d.income, d.expense)), 1);
+
+  // Loading state
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)]">
+        <Header activePage="laporan" />
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary)]"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not logged in - will redirect via useEffect
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)]">

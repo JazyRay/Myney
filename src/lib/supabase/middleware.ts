@@ -25,16 +25,53 @@ export async function updateSession(request: NextRequest) {
   // supabase.auth.getUser(). A simple mistake could make your application
   // vulnerable to security issues.
 
-  // Refresh user session
-  await supabase.auth.getUser();
+  // Refresh user session with error handling
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  // You can add protected routes logic here if needed
-  // Example:
-  // if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/login'
-  //   return NextResponse.redirect(url)
-  // }
+    // If there's an auth error (like invalid refresh token), clear the session
+    if (error) {
+      // Only log actual errors, not missing session (which is normal for unauthenticated users)
+      if (!error.message.includes('Auth session missing')) {
+        console.error('Auth error in middleware:', error.message);
+      }
+
+      // Clear all auth cookies and continue (don't block)
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        if (cookie.name.includes('sb-') || cookie.name.includes('supabase')) {
+          supabaseResponse.cookies.delete(cookie.name);
+        }
+      });
+
+      // If on protected route, redirect to login
+      const protectedPaths = ['/dashboard', '/transaksi', '/laporan', '/profile'];
+      const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
+
+      if (isProtectedPath) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        return NextResponse.redirect(url);
+      }
+
+      return supabaseResponse;
+    }
+
+    // Protected routes logic
+    const protectedPaths = ['/dashboard', '/transaksi', '/laporan', '/profile'];
+    const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
+
+    if (!user && isProtectedPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
+  } catch (error) {
+    console.error('Unexpected error in middleware:', error);
+    // Don't block on errors, just continue
+  }
 
   return supabaseResponse;
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,8 +13,34 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  // Clear any stale sessions on mount
+  useEffect(() => {
+    const clearStaleSession = async () => {
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.auth.getSession();
+
+        // If there's an error getting session, sign out to clear it
+        if (error) {
+          await supabase.auth.signOut();
+        }
+      } catch (err) {
+        console.error('Error clearing stale session:', err);
+      }
+    };
+
+    clearStaleSession();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,17 +51,36 @@ export default function LoginPage() {
       if (isSignUp) {
         await signUp(email, password);
         setError('Cek email Anda untuk konfirmasi pendaftaran!');
+        setIsLoading(false);
       } else {
         await signIn(email, password);
-        router.push('/');
+        // Force hard navigation to dashboard after successful login
+        // This ensures the auth state is properly refreshed
+        window.location.href = '/dashboard';
       }
     } catch (err) {
       console.error('Auth error:', err);
       setError(err instanceof Error ? err.message : isSignUp ? 'Gagal mendaftar. Silakan coba lagi.' : 'Email atau password salah.');
-    } finally {
       setIsLoading(false);
     }
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary)] mx-auto mb-4"></div>
+          <p className="text-[var(--foreground)]/60">Memuat...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If already logged in, show nothing (will redirect)
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">

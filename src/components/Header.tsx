@@ -32,7 +32,8 @@ export default function Header({ activePage = 'dashboard' }: HeaderProps) {
     try {
       await signOut();
       setIsProfileMenuOpen(false);
-      router.push('/login');
+      // Force hard navigation to landing page after logout
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -57,15 +58,19 @@ export default function Header({ activePage = 'dashboard' }: HeaderProps) {
             </Link>
           </div>
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/" className={`transition-colors font-medium ${activePage === 'dashboard' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
+            <Link href="/dashboard" className={`transition-colors font-medium ${activePage === 'dashboard' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
               Dashboard
             </Link>
-            <Link href="/transaksi" className={`transition-colors font-medium ${activePage === 'transaksi' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
-              Transaksi
-            </Link>
-            <Link href="/laporan" className={`transition-colors font-medium ${activePage === 'laporan' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
-              Laporan
-            </Link>
+            {user && (
+              <>
+                <Link href="/transaksi" className={`transition-colors font-medium ${activePage === 'transaksi' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
+                  Transaksi
+                </Link>
+                <Link href="/laporan" className={`transition-colors font-medium ${activePage === 'laporan' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]/60 hover:text-[var(--primary)]'}`}>
+                  Laporan
+                </Link>
+              </>
+            )}
           </nav>
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button */}
@@ -78,19 +83,23 @@ export default function Header({ activePage = 'dashboard' }: HeaderProps) {
               {/* Dropdown Menu */}
               <div className="absolute right-0 top-12 w-48 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-xl opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200">
                 <div className="py-2">
-                  <Link href="/" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'dashboard' ? 'text-[var(--primary)]' : ''}`}>
+                  <Link href="/dashboard" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'dashboard' ? 'text-[var(--primary)]' : ''}`}>
                     Dashboard
                   </Link>
-                  <Link href="/transaksi" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'transaksi' ? 'text-[var(--primary)]' : ''}`}>
-                    Transaksi
-                  </Link>
-                  <Link href="/laporan" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'laporan' ? 'text-[var(--primary)]' : ''}`}>
-                    Laporan
-                  </Link>
-                  <div className="border-t border-[var(--border)] my-2"></div>
-                  <Link href="/profile" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'profile' ? 'text-[var(--primary)]' : ''}`}>
-                    👤 Profile
-                  </Link>
+                  {user && (
+                    <>
+                      <Link href="/transaksi" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'transaksi' ? 'text-[var(--primary)]' : ''}`}>
+                        Transaksi
+                      </Link>
+                      <Link href="/laporan" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'laporan' ? 'text-[var(--primary)]' : ''}`}>
+                        Laporan
+                      </Link>
+                      <div className="border-t border-[var(--border)] my-2"></div>
+                      <Link href="/profile" className={`block px-4 py-2 hover:bg-[var(--background)] ${activePage === 'profile' ? 'text-[var(--primary)]' : ''}`}>
+                        👤 Profile
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

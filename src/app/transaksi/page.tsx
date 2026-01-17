@@ -1,74 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import AddTransactionModal from '@/components/AddTransactionModal';
 import FloatingAddButton from '@/components/FloatingAddButton';
 import BalanceCard from '@/components/BalanceCard';
-import { Transaction, TransactionType, incomeCategories, expenseCategories } from '@/types';
-
-// Sample data untuk demo
-const initialTransactions: Transaction[] = [
-  {
-    id: '1',
-    type: 'income',
-    amount: 15000000,
-    category: 'Gaji',
-    description: 'Gaji bulan Januari',
-    date: '2026-01-10',
-  },
-  {
-    id: '2',
-    type: 'expense',
-    amount: 500000,
-    category: 'Makanan',
-    description: 'Belanja bulanan',
-    date: '2026-01-12',
-  },
-  {
-    id: '3',
-    type: 'expense',
-    amount: 1500000,
-    category: 'Tagihan',
-    description: 'Listrik dan internet',
-    date: '2026-01-11',
-  },
-  {
-    id: '4',
-    type: 'income',
-    amount: 2500000,
-    category: 'Freelance',
-    description: 'Project website',
-    date: '2026-01-08',
-  },
-  {
-    id: '5',
-    type: 'expense',
-    amount: 200000,
-    category: 'Transportasi',
-    description: 'Bensin',
-    date: '2026-01-13',
-  },
-  {
-    id: '6',
-    type: 'expense',
-    amount: 150000,
-    category: 'Hiburan',
-    description: 'Nonton bioskop',
-    date: '2026-01-09',
-  },
-  {
-    id: '7',
-    type: 'expense',
-    amount: 300000,
-    category: 'Kesehatan',
-    description: 'Obat-obatan',
-    date: '2026-01-07',
-  },
-];
+import { TransactionType, incomeCategories, expenseCategories } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import { useTransactions } from '@/hooks/useTransactions';
 
 export default function TransaksiPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  const { transactions, isLoading, totalIncome, totalExpense, balance, addTransaction, deleteTransaction } = useTransactions();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<'all' | TransactionType>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -81,6 +27,24 @@ export default function TransaksiPage() {
   const [quickType, setQuickType] = useState<TransactionType>('expense');
   const [quickCategory, setQuickCategory] = useState<string>('');
   const [quickDescription, setQuickDescription] = useState<string>('');
+
+  // Delete confirmation modal states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<{
+    id: string;
+    type: 'income' | 'expense';
+    amount: number;
+    category: string;
+    description: string;
+    date: string;
+  } | null>(null);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -99,14 +63,89 @@ export default function TransaksiPage() {
     }).format(date);
   };
 
-  const getCategoryIcon = (transaction: Transaction) => {
-    const categories = transaction.type === 'income' ? incomeCategories : expenseCategories;
-    const category = categories.find((c) => c.name === transaction.category);
-    return category?.icon || '📦';
+  const getCategoryIcon = (type: 'income' | 'expense', category: string) => {
+    const categories = type === 'income' ? incomeCategories : expenseCategories;
+    const cat = categories.find((c) => c.name === category);
+    return cat?.icon || '📦';
   };
 
+  // Delete Confirmation Modal Component
+  const DeleteConfirmModal = ({
+    isOpen,
+    transaction,
+    onConfirm,
+    onCancel,
+  }: {
+    isOpen: boolean;
+    transaction: { type: 'income' | 'expense'; amount: number; category: string; description: string } | null;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }) => {
+    if (!isOpen || !transaction) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onCancel}>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          {/* Icon */}
+          <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 text-red-500">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-xl font-bold text-center mb-2">Hapus Transaksi?</h3>
+          <p className="text-center text-[var(--foreground)]/60 mb-6">Tindakan ini tidak dapat dibatalkan</p>
+
+          {/* Transaction Info */}
+          <div className="bg-[var(--background)] rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[var(--foreground)]/60">Kategori</span>
+              <span className="font-medium">{transaction.category}</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[var(--foreground)]/60">Deskripsi</span>
+              <span className="font-medium">{transaction.description || '-'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--foreground)]/60">Jumlah</span>
+              <span className={`font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                {transaction.type === 'income' ? '+' : '-'}
+                {formatCurrency(transaction.amount)}
+              </span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button onClick={onCancel} className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] hover:bg-[var(--background)] transition-colors font-medium">
+              Batal
+            </button>
+            <button onClick={onConfirm} className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors font-medium">
+              Hapus
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Convert transactions for display
+  const formattedTransactions = transactions.map((t) => ({
+    id: t.id,
+    type: t.type,
+    amount: Number(t.amount),
+    category: t.category,
+    description: t.description || '',
+    date: t.date,
+  }));
+
   // Filter transactions
-  const filteredTransactions = transactions.filter((t) => {
+  const filteredTransactions = formattedTransactions.filter((t) => {
     const matchesType = filterType === 'all' || t.type === filterType;
     const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
     const matchesSearch = t.description.toLowerCase().includes(searchQuery.toLowerCase()) || t.category.toLowerCase().includes(searchQuery.toLowerCase());
@@ -122,42 +161,64 @@ export default function TransaksiPage() {
   // Get available categories based on filter type
   const availableCategories = filterType === 'income' ? incomeCategories : filterType === 'expense' ? expenseCategories : [...incomeCategories, ...expenseCategories];
 
-  const handleAddTransaction = (newTransaction: { type: TransactionType; amount: number; category: string; description: string; date: string }) => {
-    const transaction: Transaction = {
-      id: Date.now().toString(),
-      ...newTransaction,
-    };
-    setTransactions([transaction, ...transactions]);
+  const handleAddTransaction = async (newTransaction: { type: TransactionType; amount: number; category: string; description: string; date: string }) => {
+    try {
+      await addTransaction(newTransaction);
+    } catch (err) {
+      console.error('Failed to add transaction:', err);
+      alert('Gagal menambah transaksi. Silakan coba lagi.');
+    }
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions(transactions.filter((t) => t.id !== id));
+  const handleDeleteClick = (transaction: (typeof sortedTransactions)[0]) => {
+    setSelectedTransaction(transaction);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (selectedTransaction) {
+      try {
+        await deleteTransaction(selectedTransaction.id);
+        setDeleteModalOpen(false);
+        setSelectedTransaction(null);
+      } catch (err) {
+        console.error('Failed to delete transaction:', err);
+        alert('Gagal menghapus transaksi. Silakan coba lagi.');
+      }
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteModalOpen(false);
+    setSelectedTransaction(null);
   };
 
   // Get categories for quick input based on selected type
   const quickInputCategories = quickType === 'income' ? incomeCategories : expenseCategories;
 
   // Quick add transaction handler
-  const handleQuickAdd = () => {
+  const handleQuickAdd = async () => {
     const amount = parseFloat(quickAmount.replace(/[^0-9]/g, ''));
     if (!amount || amount <= 0) return;
 
     const today = new Date().toISOString().split('T')[0];
     const selectedCategory = quickCategory || 'Lainnya';
 
-    const transaction: Transaction = {
-      id: Date.now().toString(),
-      type: quickType,
-      amount: amount,
-      category: selectedCategory,
-      description: quickDescription || (quickType === 'income' ? 'Pendapatan cepat' : 'Pengeluaran cepat'),
-      date: today,
-    };
-
-    setTransactions([transaction, ...transactions]);
-    setQuickAmount('');
-    setQuickCategory('');
-    setQuickDescription('');
+    try {
+      await addTransaction({
+        type: quickType,
+        amount: amount,
+        category: selectedCategory,
+        description: quickDescription || (quickType === 'income' ? 'Pendapatan cepat' : 'Pengeluaran cepat'),
+        date: today,
+      });
+      setQuickAmount('');
+      setQuickCategory('');
+      setQuickDescription('');
+    } catch (err) {
+      console.error('Failed to quick add transaction:', err);
+      alert('Gagal menambah transaksi. Silakan coba lagi.');
+    }
   };
 
   // Handle quick type change - reset category when type changes
@@ -172,16 +233,26 @@ export default function TransaksiPage() {
     return number ? new Intl.NumberFormat('id-ID').format(parseInt(number)) : '';
   };
 
-  // Calculate total income, expense, and balance
-  const totalIncome = transactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-
-  const totalExpense = transactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-
-  const totalBalance = totalIncome - totalExpense;
-
   const totalFiltered = sortedTransactions.reduce((sum, t) => {
     return t.type === 'income' ? sum + t.amount : sum - t.amount;
   }, 0);
+
+  // Loading state
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)]">
+        <Header activePage="transaksi" />
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary)]"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not logged in - will redirect via useEffect
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -196,7 +267,7 @@ export default function TransaksiPage() {
 
         {/* Balance Card */}
         <div className="mb-6">
-          <BalanceCard balance={totalBalance} income={totalIncome} expense={totalExpense} />
+          <BalanceCard balance={balance} income={totalIncome} expense={totalExpense} />
         </div>
 
         {/* Quick Input Section */}
@@ -468,7 +539,7 @@ export default function TransaksiPage() {
                       </td>
                       <td className="py-4 px-4 text-center">
                         <button
-                          onClick={() => handleDeleteTransaction(transaction.id)}
+                          onClick={() => handleDeleteClick(transaction)}
                           className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200 mx-auto"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
@@ -494,6 +565,9 @@ export default function TransaksiPage() {
 
       {/* Add Transaction Modal */}
       <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAdd={handleAddTransaction} />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal isOpen={deleteModalOpen} transaction={selectedTransaction} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />
     </div>
   );
 }
